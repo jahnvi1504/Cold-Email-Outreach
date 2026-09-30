@@ -1,4 +1,6 @@
 import express, { type ErrorRequestHandler } from 'express';
+import cors from 'cors';
+import { env } from './config/env.js';
 import { scheduleRoutes } from './routes/scheduleRoutes.js';
 import { searchRoutes } from './routes/searchRoutes.js';
 import { createBullBoard } from '@bull-board/api';
@@ -15,6 +17,7 @@ const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => 
 
 export const createApp = () => {
   const app = express();
+  app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
   app.use(express.json({ limit: '2mb' }));
   app.get('/health', (_request, response) => response.json({ ok: true }));
   app.use('/api/schedule', scheduleRoutes);
