@@ -5,6 +5,7 @@ import { EMAIL_QUEUE_NAME } from '../queue/emailQueue.js';
 import { redis } from '../queue/connection.js';
 import { sendEmail } from '../services/senderService.js';
 import { reserveSendSlot } from '../services/rateLimitService.js';
+import { indexEmail } from '../services/searchService.js';
 
 export const emailWorker = new Worker(EMAIL_QUEUE_NAME, async (job) => {
   const emailId = String(job.data.emailId);
@@ -24,7 +25,8 @@ export const emailWorker = new Worker(EMAIL_QUEUE_NAME, async (job) => {
   if (!email?.sender) throw new Error('Email sender is unavailable');
   try {
     await sendEmail(email.sender, email.recipient, email.subject, email.body);
-    await prisma.emailJob.update({ where: { id: emailId }, data: { status: 'sent', processedAt: new Date() } });
+    const sent = await prisma.emailJob.update({ where: { id: emailId }, data: { status: 'sent', processedAt: new Date() } });
+    await indexEmail(sent);
   } catch (error) {
     await prisma.emailJob.update({ where: { id: emailId }, data: { status: 'scheduled', lastError: error instanceof Error ? error.message : String(error) } });
     throw error;
@@ -33,8 +35,9 @@ export const emailWorker = new Worker(EMAIL_QUEUE_NAME, async (job) => {
 
 emailWorker.on('failed', async (job, error) => {
   if (!job || job.attemptsMade < (job.opts.attempts ?? 1)) return;
-  await prisma.emailJob.updateMany({
-    where: { id: String(job.data.emailId), status: { in: ['scheduled', 'processing'] } },
+  const failed = await prisma.emailJob.update({
+    where: { id: String(job.data.emailId) },
     data: { status: 'failed', processedAt: new Date(), lastError: error.message }
   });
+  await indexEmail(failed);
 });

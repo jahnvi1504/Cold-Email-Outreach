@@ -3,6 +3,7 @@ import { prisma } from '../db/client.js';
 import { emailQueue } from '../queue/emailQueue.js';
 import { env } from '../config/env.js';
 import { getRequestUser } from '../services/userService.js';
+import { indexEmail } from '../services/searchService.js';
 
 const scheduleSchema = z.object({
   subject: z.string().min(1).max(500),
@@ -44,6 +45,7 @@ export const scheduleEmails = async (request: any, response: any, next: any) => 
       removeOnComplete: 1000,
       removeOnFail: 5000
     })));
+    await Promise.all(jobs.map(indexEmail));
     return response.status(201).json({ count: jobs.length, jobs });
   } catch (error) {
     return next(error);
