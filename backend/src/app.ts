@@ -7,10 +7,12 @@ import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { emailQueue } from './queue/emailQueue.js';
+import { ZodError } from 'zod';
 import { authRoutes } from './routes/authRoutes.js';
 import { slackRoutes } from './routes/slackRoutes.js';
 
 const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
+  if (error instanceof ZodError) return response.status(400).json({ error: 'Invalid request', details: error.issues });
   console.error(error);
   response.status(500).json({ error: 'Internal server error' });
 };
