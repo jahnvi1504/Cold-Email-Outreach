@@ -6,13 +6,15 @@ import { redis } from '../queue/connection.js';
 import { sendEmail } from '../services/senderService.js';
 import { reserveSendSlot } from '../services/rateLimitService.js';
 import { indexEmail } from '../services/searchService.js';
+import { notifyRateLimit } from '../services/slackService.js';
 
 export const emailWorker = new Worker(EMAIL_QUEUE_NAME, async (job) => {
   const emailId = String(job.data.emailId);
-  const pendingEmail = await prisma.emailJob.findUnique({ where: { id: emailId }, include: { sender: true } });
+  const pendingEmail = await prisma.emailJob.findUnique({ where: { id: emailId }, include: { sender: true, user: true } });
   if (!pendingEmail || pendingEmail.status !== 'scheduled' || !pendingEmail.sender) return;
   const slot = await reserveSendSlot(pendingEmail.sender, pendingEmail.hourlyLimit ?? undefined);
   if (!slot.allowed) {
+    if (slot.reason === 'hourly-limit') await notifyRateLimit(pendingEmail.userId, pendingEmail.sender.email, slot.retryAt);
     await job.moveToDelayed(slot.retryAt, job.token);
     return;
   }

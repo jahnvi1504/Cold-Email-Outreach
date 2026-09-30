@@ -20,7 +20,7 @@ export const scheduleEmails = async (request: any, response: any, next: any) => 
     if (input.startTime.getTime() <= Date.now()) {
       return response.status(400).json({ error: 'startTime must be in the future' });
     }
-    const user = await getRequestUser(request.header('x-user-email'));
+    const user = await getRequestUser(request.header('x-user-email'), request.userId);
     const senders = await prisma.sender.findMany({ where: { userId: user.id, active: true }, orderBy: { createdAt: 'asc' } });
     if (senders.length === 0) {
       return response.status(400).json({ error: 'No active SMTP senders configured' });
@@ -54,7 +54,7 @@ export const scheduleEmails = async (request: any, response: any, next: any) => 
 
 export const listScheduledEmails = async (request: any, response: any, next: any) => {
   try {
-    const user = await getRequestUser(request.header('x-user-email'));
+    const user = await getRequestUser(request.header('x-user-email'), request.userId);
     const jobs = await prisma.emailJob.findMany({ where: { userId: user.id, status: 'scheduled' }, orderBy: { scheduledAt: 'asc' } });
     return response.json(jobs);
   } catch (error) {
@@ -64,7 +64,7 @@ export const listScheduledEmails = async (request: any, response: any, next: any
 
 export const listSentEmails = async (request: any, response: any, next: any) => {
   try {
-    const user = await getRequestUser(request.header('x-user-email'));
+    const user = await getRequestUser(request.header('x-user-email'), request.userId);
     const jobs = await prisma.emailJob.findMany({ where: { userId: user.id, status: { in: ['sent', 'failed'] } }, orderBy: { processedAt: 'desc' } });
     return response.json(jobs);
   } catch (error) {
